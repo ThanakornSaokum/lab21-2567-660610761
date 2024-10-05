@@ -1,5 +1,5 @@
 import { checkToken } from "@lib/checkToken";
-import { Database, Payload } from "@lib/types";
+import { Payload } from "@lib/types";
 import { NextRequest, NextResponse } from "next/server";
 import { getPrisma } from "@lib/getPrisma";
 
@@ -45,6 +45,7 @@ export const GET = async () => {
 };
 
 export const POST = async (request: NextRequest) => {
+  console.log("POST enrollments");
   const payload = checkToken();
   if (!payload) {
     return NextResponse.json(
@@ -79,6 +80,41 @@ export const POST = async (request: NextRequest) => {
       { status: 400 }
     );
   }
+
+  const prisma = getPrisma();
+  const findCourse = await prisma.course.findUnique({
+    where: { courseNo: courseNo },
+  });
+
+  if (!findCourse) {
+    return NextResponse.json(
+      {
+        ok: false,
+        message: "Course number does not exist",
+      },
+      { status: 404 }
+    );
+  }
+
+  const findEnrollment = await prisma.enrollment.findFirst({
+    where: { studentId: studentId, courseNo: courseNo },
+  });
+  if (findEnrollment) {
+    return NextResponse.json(
+      {
+        ok: false,
+        message: "You already registered this course",
+      },
+      { status: 409 }
+    );
+  }
+
+  await prisma.enrollment.create({
+    data: {
+      studentId: studentId,
+      courseNo: courseNo,
+    },
+  });
 
   // Coding in lecture
 
@@ -127,6 +163,41 @@ export const DELETE = async (request: NextRequest) => {
 
   const prisma = getPrisma();
   // Perform data delete
+  const findCourse = await prisma.course.findUnique({
+    where: { courseNo: courseNo },
+  });
+
+  if (!findCourse) {
+    return NextResponse.json(
+      {
+        ok: false,
+        message: "Course number does not exist",
+      },
+      { status: 404 }
+    );
+  }
+
+  const findEnrollment = await prisma.enrollment.findFirst({
+    where: { studentId: studentId, courseNo: courseNo },
+  });
+
+  if (!findEnrollment) {
+    return NextResponse.json(
+      {
+        ok: false,
+        message: "You have not enrolled this course",
+      },
+      { status: 404 }
+    );
+  }
+
+  await prisma.enrollment.delete({
+    where: {
+      courseNo_studentId: {
+        courseNo: courseNo, studentId: studentId
+      },
+    }
+  })
 
   return NextResponse.json({
     ok: true,
